@@ -35,13 +35,15 @@ jobs:
       - name: Get release assets
         id: assets
         run: |
-          ASSET_PATH=$(ls target/sap-devops-*.zip 2>/dev/null | head -1)
+          ASSET_PATH=$(ls $GITHUB_WORKSPACE/target/sap-devops-*.zip 2>/dev/null | head -1)
           if [ -z "$ASSET_PATH" ]; then
-            echo "Error: No zip artifact found"
+            echo "Error: No zip artifact found in $GITHUB_WORKSPACE/target/"
+            ls -la $GITHUB_WORKSPACE/target/ || true
             exit 1
           fi
           echo "ASSET_PATH=$ASSET_PATH" >> $GITHUB_OUTPUT
           echo "ASSET_NAME=$(basename $ASSET_PATH)" >> $GITHUB_OUTPUT
+          echo "Found artifact: $ASSET_PATH"
 
       - name: Create Release
         id: create_release

@@ -7,16 +7,19 @@ on:
       - develop
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   snapshot:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up JDK 11
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '11'
           distribution: 'temurin'
@@ -52,7 +55,7 @@ jobs:
           prerelease: true
           artifacts: ${{ steps.assets.outputs.ASSET_PATH }}
           allowUpdates: true
-          updateOnlyUnrelease: false
+          updateOnlyUnreleased: false
 
       - name: Clean old snapshots
         env:
@@ -70,3 +73,4 @@ jobs:
               echo "Deleting old snapshot: $tag"
               gh release delete "$tag" --repo "$REPO" --yes
             done
+

@@ -28,10 +28,6 @@ jobs:
           echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_OUTPUT
           echo "TAG=snapshot-$TIMESTAMP" >> $GITHUB_OUTPUT
 
-      - name: Update pom.xml version
-        run: |
-          sed -i 's/<version>.*<\/version>/<version>${{ steps.snapshot.outputs.TIMESTAMP }}<\/version>/' pom.xml
-
       - name: Build with Maven
         run: mvn clean package
 

@@ -39,21 +39,11 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ steps.version.outputs.VERSION }}
+          tag: ${{ github.ref }}
+          name: Release ${{ steps.version.outputs.VERSION }}
           draft: false
           prerelease: false
+          artifacts: ${{ steps.assets.outputs.ASSET_PATH }}
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.assets.outputs.ASSET_PATH }}
-          asset_name: ${{ steps.assets.outputs.ASSET_NAME }}
-          asset_content_type: application/zip

@@ -27,15 +27,7 @@ jobs:
       - name: Read POM version
         id: snapshot
         run: |
-          VERSION=$(python - <<'PY'
-import xml.etree.ElementTree as ET
-from pathlib import Path
-root = ET.parse(Path('pom.xml')).getroot()
-ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
-version = root.find('m:version', ns)
-print(version.text if version is not None else '1.0.0')
-PY
-)
+          VERSION=$(python -c "import xml.etree.ElementTree as ET; tree=ET.parse('pom.xml'); root=tree.getroot(); ns={'m':'http://maven.apache.org/POM/4.0.0'}; v=root.find('m:version', ns); print(v.text if v is not None else '1.0.0')")
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "SNAPSHOT_VERSION=snapshot-${VERSION}" >> $GITHUB_OUTPUT
           echo "TAG=snapshot-${{ github.run_number }}" >> $GITHUB_OUTPUT

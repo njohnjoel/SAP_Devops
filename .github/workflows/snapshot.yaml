@@ -24,12 +24,21 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
-      - name: Generate snapshot version
+      - name: Read POM version
         id: snapshot
         run: |
-          TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
-          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_OUTPUT
-          echo "TAG=snapshot-$TIMESTAMP" >> $GITHUB_OUTPUT
+          VERSION=$(python - <<'PY'
+import xml.etree.ElementTree as ET
+from pathlib import Path
+root = ET.parse(Path('pom.xml')).getroot()
+ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+version = root.find('m:version', ns)
+print(version.text if version is not None else '1.0.0')
+PY
+)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "SNAPSHOT_VERSION=snapshot-${VERSION}" >> $GITHUB_OUTPUT
+          echo "TAG=snapshot-${{ github.run_number }}" >> $GITHUB_OUTPUT
 
       - name: Build with Maven
         run: mvn clean package
@@ -37,25 +46,38 @@ jobs:
       - name: Get snapshot artifacts
         id: assets
         run: |
-          ASSET_PATH=$(ls target/sap-devops-*.zip 2>/dev/null | head -1)
+          ASSET_PATH=$(ls $GITHUB_WORKSPACE/target/sap-devops-*.zip 2>/dev/null | head -1)
           if [ -z "$ASSET_PATH" ]; then
-            echo "Error: No zip artifact found"
+            echo "Error: No zip artifact found in $GITHUB_WORKSPACE/target/"
+            ls -la $GITHUB_WORKSPACE/target/ || true
             exit 1
           fi
-          SNAPSHOT_NAME="sap-devops-snapshot-${{ steps.snapshot.outputs.TIMESTAMP }}.zip"
-          mv "$ASSET_PATH" "$SNAPSHOT_NAME"
-          echo "ASSET_PATH=$SNAPSHOT_NAME" >> $GITHUB_OUTPUT
+          SNAPSHOT_NAME="sap-devops-${{ steps.snapshot.outputs.SNAPSHOT_VERSION }}.zip"
+          mv "$ASSET_PATH" "$GITHUB_WORKSPACE/$SNAPSHOT_NAME"
+          echo "ASSET_PATH=$GITHUB_WORKSPACE/$SNAPSHOT_NAME" >> $GITHUB_OUTPUT
+          echo "Found and renamed artifact to: $SNAPSHOT_NAME"
 
       - name: Create snapshot release
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.snapshot.outputs.TAG }}
-          name: Snapshot ${{ steps.snapshot.outputs.TIMESTAMP }}
+          name: Snapshot ${{ steps.snapshot.outputs.VERSION }}
           draft: false
           prerelease: true
           artifacts: ${{ steps.assets.outputs.ASSET_PATH }}
           allowUpdates: true
           updateOnlyUnreleased: false
+
+      - name: Remove GitHub source archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.snapshot.outputs.TAG }}"
+          gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null | \
+            grep -E 'Source code' | while read -r name; do
+              echo "Removing: $name"
+              gh release delete-asset "$TAG" "$name" --repo "${{ github.repository }}" --yes || true
+            done
 
       - name: Clean old snapshots
         env:

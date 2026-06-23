@@ -64,18 +64,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Authenticate gh with the provided token
+          echo "$GITHUB_TOKEN" | gh auth login --with-token || true
+
           REPO="${{ github.repository }}"
           TAG="${{ steps.snapshot.outputs.TAG }}"
-          echo "Removing GitHub-generated source archives from release $TAG in $REPO"
-          ASSET_IDS=$(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[] | select(.name | test("Source code")) | .id' 2>/dev/null || true)
-          if [ -z "$ASSET_IDS" ]; then
-            echo "No source archives found to remove"
-          else
+
+          # Retry deletion a few times to handle eventual consistency
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i: checking for source archives in release $TAG"
+            ASSET_IDS=$(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[] | select(.name | test("Source code")) | .id' 2>/dev/null || true)
+            if [ -z "$ASSET_IDS" ]; then
+              echo "No source archives found to remove"
+              break
+            fi
             for id in $ASSET_IDS; do
               echo "Deleting asset id: $id"
               gh api -X DELETE /repos/$REPO/releases/assets/$id -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" || true
             done
-          fi
+            echo "Waiting for assets to disappear..."
+            sleep 3
+          done
 
       - name: Clean old snapshots
         env:

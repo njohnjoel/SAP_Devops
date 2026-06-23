@@ -53,3 +53,21 @@ jobs:
           prerelease: false
           artifacts: ${{ steps.assets.outputs.ASSET_PATH }}
 
+      - name: Remove GitHub source archives
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          TAG="v${{ steps.version.outputs.VERSION }}"
+          echo "Removing GitHub-generated source archives from release $TAG in $REPO"
+          ASSET_IDS=$(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[] | select(.name | test("Source code")) | .id' 2>/dev/null || true)
+          if [ -z "$ASSET_IDS" ]; then
+            echo "No source archives found to remove"
+          else
+            for id in $ASSET_IDS; do
+              echo "Deleting asset id: $id"
+              gh api -X DELETE /repos/$REPO/releases/assets/$id -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" || true
+            done
+          fi
+
+

@@ -62,14 +62,20 @@ jobs:
 
       - name: Remove GitHub source archives
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          REPO="${{ github.repository }}"
           TAG="${{ steps.snapshot.outputs.TAG }}"
-          gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null | \
-            grep -E 'Source code' | while read -r name; do
-              echo "Removing: $name"
-              gh release delete-asset "$TAG" "$name" --repo "${{ github.repository }}" --yes || true
+          echo "Removing GitHub-generated source archives from release $TAG in $REPO"
+          ASSET_IDS=$(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[] | select(.name | test("Source code")) | .id' 2>/dev/null || true)
+          if [ -z "$ASSET_IDS" ]; then
+            echo "No source archives found to remove"
+          else
+            for id in $ASSET_IDS; do
+              echo "Deleting asset id: $id"
+              gh api -X DELETE /repos/$REPO/releases/assets/$id -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" || true
             done
+          fi
 
       - name: Clean old snapshots
         env:
